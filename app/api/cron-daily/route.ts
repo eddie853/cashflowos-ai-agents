@@ -4,6 +4,7 @@ import { sendMessage } from '@/lib/telegram'
 import { getRecords, getFunnel, rm, todayISO, type Rec } from '@/lib/records'
 import { propose, proposeAndNotify, runAutopilot } from '@/lib/actions'
 import { SCHEDULED, type ProposalDraft } from '@/agents/registry'
+import { syncMetaAdSpend } from '@/lib/meta-ads'
 
 // 🔒 Don't edit — this keeps your robot safe.
 // THE ONE daily cron (Vercel Hobby allows 2; we ship 1, reserve the other).
@@ -43,6 +44,9 @@ export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET?.trim()
   const authed = !!secret && req.headers.get('authorization') === `Bearer ${secret}`
   if (!authed) return new Response('forbidden', { status: 401 })
+
+  // ⓪ Pull the last 7 days of Meta ad spend into Cash Out first, so the brief includes it.
+  const metaAds = await syncMetaAdSpend()
 
   const today = todayISO()
   const rows = await getRecords()
@@ -129,6 +133,7 @@ export async function GET(req: Request) {
     recipients: to.length,
     needs_yes: proposed.length,
     proposals_created: created,
+    meta_ads: metaAds,
   })
 }
 
