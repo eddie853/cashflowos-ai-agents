@@ -1,5 +1,6 @@
 import { supabase, supabaseConfigured } from '@/lib/supabase'
 import Empty from '@/app/_components/Empty'
+import { requireTab } from '@/lib/auth'
 
 // 🔒 Don't edit — this keeps your robot safe.
 // The Vault reads private files and hands the browser SHORT-LIVED signed URLs,
@@ -76,6 +77,7 @@ async function getVaultCards(): Promise<{ cards: VaultCard[]; error: string | nu
 }
 
 export default async function Vault() {
+  await requireTab('/vault')
   const { cards, error } = await getVaultCards()
 
   return (

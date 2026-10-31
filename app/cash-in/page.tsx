@@ -4,6 +4,7 @@
 import { getRecords, rm, m, todayISO } from '@/lib/records'
 import Empty from '@/app/_components/Empty'
 import Stat from '@/app/_components/Stat'
+import { requireTab } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,6 +13,7 @@ export const dynamic = 'force-dynamic'
 const WAITING = ['waiting', 'unpaid', 'overdue', 'pending']
 
 export default async function CashIn() {
+  await requireTab('/cash-in')
   const all = await getRecords()
   const rows = all.filter(r => r.category === 'cash_in')
 

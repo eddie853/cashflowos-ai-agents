@@ -37,6 +37,12 @@ export const supabase = createClient(url, key, {
   global: { fetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, { ...init, signal: AbortSignal.timeout(4000) }) },
 })
 
+// A throwaway client for ONE password check (lib/auth.ts). Never reuse the shared
+// `supabase` client for signInWithPassword: a sign-in would swap its service_role
+// powers for that user's session on every later query.
+export const freshAuthClient = () =>
+  createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+
 // "Configured" = REAL, non-placeholder values present (after cleaning). So a
 // participant who runs `npm run dev` right after `cp .env.example .env` (before
 // filling Supabase) sees the connect banner INSTANTLY instead of a ~7s hang.

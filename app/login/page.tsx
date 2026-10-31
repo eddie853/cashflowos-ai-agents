@@ -1,11 +1,12 @@
 'use client'
 import { useState } from 'react'
 
-// The lock screen. One passcode field, friendly copy. On success the server sets
-// the session cookie and we send you to your HQ. This page is EXCLUDED from the
-// passcode gate in proxy.ts (you can't log in through a locked login page).
+// The lock screen: email + password. On success the server sets the login cookie
+// and we send you to your HQ. Excluded from the gate in proxy.ts (you can't log in
+// through a locked login page). No sign-up here — an Admin invites you.
 export default function Login() {
-  const [passcode, setPasscode] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -17,18 +18,14 @@ export default function Login() {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ passcode }),
+        body: JSON.stringify({ email, password }),
       })
       const body = await res.json().catch(() => ({}))
       if (res.ok && body.ok) {
         window.location.href = '/'
         return
       }
-      if (body.reason === 'no_passcode_set') {
-        setError("No passcode is set yet, so there's nothing to unlock — just open the app.")
-      } else {
-        setError("That code didn't match. Try again.")
-      }
+      setError(body.reason || "That didn't work. Try again.")
     } catch {
       setError('Something went wrong reaching the server. Check your connection and try again.')
     } finally {
@@ -42,24 +39,35 @@ export default function Login() {
         <div className="brand" style={{ marginBottom: 8 }}>
           <img className="logo" src="/icons/logo.png" alt="" /> LuxeVow Weddings
         </div>
-        <h1 className="ph" style={{ fontSize: 18 }}>Enter your passcode</h1>
+        <h1 className="ph" style={{ fontSize: 18 }}>Log in</h1>
         <p className="cap" style={{ margin: '4px 0 16px' }}>
-          A lock on the door, not bank-grade security — just enough to keep your numbers private.
+          No account? Ask your admin for an invite link.
         </p>
         <input
           className="login-input"
-          type="password"
-          inputMode="text"
-          autoComplete="current-password"
-          placeholder="Passcode"
-          value={passcode}
-          onChange={e => setPasscode(e.target.value)}
+          type="email"
+          autoComplete="username"
+          placeholder="Email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
           autoFocus
         />
+        <input
+          className="login-input"
+          type="password"
+          autoComplete="current-password"
+          placeholder="Password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+          style={{ marginTop: 10 }}
+        />
         {error ? <p className="login-error">{error}</p> : null}
-        <button className="btn" type="submit" disabled={busy || !passcode} style={{ width: '100%', marginTop: 12 }}>
-          {busy ? 'Checking…' : 'Unlock'}
+        <button className="btn" type="submit" disabled={busy || !email || !password} style={{ width: '100%', marginTop: 12 }}>
+          {busy ? 'Checking…' : 'Log in'}
         </button>
+        <p className="cap" style={{ margin: '12px 0 0', fontSize: 12 }}>
+          Forgot your password? Your admin can send you a reset link.
+        </p>
       </form>
     </div>
   )

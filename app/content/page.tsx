@@ -4,25 +4,36 @@
 import { getRecords, m } from '@/lib/records'
 import Empty from '@/app/_components/Empty'
 import Stat from '@/app/_components/Stat'
+import { requireTab } from '@/lib/auth'
+import { canEdit } from '@/lib/access'
+import { AddRecord, EditRecord, EditLink } from '@/app/_components/RecordForm'
 
 export const dynamic = 'force-dynamic'
 
 // The marketing calendar. category==='content'. Posts, reels, carousels AND ads
 // all live here — the kind is in `meta.format`, the channel in `meta.platform`.
 // A content item moves draft → scheduled → posted (its `status`).
-export default async function Content() {
+export default async function Content({ searchParams }: { searchParams: Promise<{ edit?: string }> }) {
+  const me = await requireTab('/content')
+  const editable = canEdit(me.role, 'content')
+  const { edit } = await searchParams
   const all = await getRecords()
   const rows = all
     .filter(r => r.category === 'content')
     // Soonest date first; undated rows sink to the bottom.
     .sort((a, b) => ((a.due_date ?? '9999') < (b.due_date ?? '9999') ? -1 : 1))
 
+  const editing = editable && edit ? rows.find(r => String(r.id) === edit) : undefined
   const count = (s: string) => rows.filter(r => (r.status || '').toLowerCase() === s).length
 
   return (
     <>
       <h1 className="ph">Content 📣</h1>
       <p className="cap">Your marketing calendar — posts, reels, carousels & ads.</p>
+
+      {editable ? (
+        editing ? <EditRecord category="content" rec={editing} /> : <AddRecord category="content" />
+      ) : null}
 
       <div className="grid">
         <Stat label="Drafts" value={count('draft')} />
@@ -42,6 +53,7 @@ export default async function Content() {
               <th>Status</th>
               <th>Date</th>
               <th>Views</th>
+              {editable ? <th></th> : null}
             </tr>
           </thead>
           <tbody>
@@ -59,6 +71,7 @@ export default async function Content() {
                   <td data-label="Views">
                     {r.meta?.views != null ? Number(r.meta.views).toLocaleString('en-MY') : '—'}
                   </td>
+                  {editable ? <td data-label=""><EditLink path="/content" id={r.id} /></td> : null}
                 </tr>
               )
             })}

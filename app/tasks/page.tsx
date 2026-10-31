@@ -4,12 +4,18 @@
 import { getRecords, todayISO } from '@/lib/records'
 import Empty from '@/app/_components/Empty'
 import Stat from '@/app/_components/Stat'
+import { requireTab } from '@/lib/auth'
+import { canEdit } from '@/lib/access'
+import { AddRecord, EditRecord, EditLink } from '@/app/_components/RecordForm'
 
 export const dynamic = 'force-dynamic'
 
 // Your ops to-dos. category==='task'. Anything past its due_date and not done is
 // flagged as overdue (red). Sorted soonest-due first; undated tasks sink last.
-export default async function Tasks() {
+export default async function Tasks({ searchParams }: { searchParams: Promise<{ edit?: string }> }) {
+  const me = await requireTab('/tasks')
+  const editable = canEdit(me.role, 'task')
+  const { edit } = await searchParams
   const today = todayISO()
   const all = await getRecords()
   const rows = all
@@ -19,6 +25,7 @@ export default async function Tasks() {
   const isOverdue = (r: (typeof rows)[number]) =>
     !!r.due_date && r.due_date < today && (r.status || '').toLowerCase() !== 'done'
 
+  const editing = editable && edit ? rows.find(r => String(r.id) === edit) : undefined
   const overdue = rows.filter(isOverdue).length
   const open = rows.filter(r => (r.status || '').toLowerCase() !== 'done').length
   const done = rows.filter(r => (r.status || '').toLowerCase() === 'done').length
@@ -27,6 +34,10 @@ export default async function Tasks() {
     <>
       <h1 className="ph">Tasks ✅</h1>
       <p className="cap">Your ops to-dos, with overdue ones flagged.</p>
+
+      {editable ? (
+        editing ? <EditRecord category="task" rec={editing} /> : <AddRecord category="task" />
+      ) : null}
 
       <div className="grid">
         <Stat label="Open" value={open} />
@@ -43,6 +54,7 @@ export default async function Tasks() {
               <th>Task</th>
               <th>Due</th>
               <th>Status</th>
+              {editable ? <th></th> : null}
             </tr>
           </thead>
           <tbody>
@@ -60,6 +72,7 @@ export default async function Tasks() {
                       {od ? 'overdue' : r.status || '—'}
                     </span>
                   </td>
+                  {editable ? <td data-label=""><EditLink path="/tasks" id={r.id} /></td> : null}
                 </tr>
               )
             })}

@@ -13,6 +13,12 @@ import { revalidatePath } from 'next/cache'
 import { claim, executeClaimed, summarizeResult } from '@/lib/actions'
 import { editMessageReplyMarkup, sendMessage } from '@/lib/telegram'
 import { logRun } from '@/lib/runs'
+import { actionUser, logActivity } from '@/lib/auth'
+import { canApprove } from '@/lib/access'
+
+// Only Admins may say YES / NO to money actions (lib/access.ts). The chat id
+// stamped on the action is still the owner's; WHO clicked goes in activity_log.
+const NOT_ALLOWED = { ok: false, message: 'Only an Admin can approve or reject.' }
 
 // In-app decisions are made by the owner. Stamp their chat id if we know it.
 const approverId = () => (process.env.OWNER_CHAT_ID ? Number(process.env.OWNER_CHAT_ID) : null)
@@ -20,6 +26,8 @@ const approverId = () => (process.env.OWNER_CHAT_ID ? Number(process.env.OWNER_C
 const plain = (s: string) => s.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&')
 
 export async function approveAction(id: number): Promise<{ ok: boolean; message: string }> {
+  const me = await actionUser()
+  if (!me || !canApprove(me.role)) return NOT_ALLOWED
   const claimed = await claim(id, approverId(), 'executing')
   if (!claimed) {
     revalidatePath('/approvals')
@@ -31,6 +39,7 @@ export async function approveAction(id: number): Promise<{ ok: boolean; message:
     await sendMessage(claimed.notify_chat_id, 'Approved in the app ✅ — running…')
   }
   const outcome = await executeClaimed(claimed)
+  await logActivity(me, outcome.ok ? 'approved' : 'approved (action failed)', claimed.agent_key, id)
   if (claimed.notify_chat_id) {
     await sendMessage(
       claimed.notify_chat_id,
@@ -45,6 +54,8 @@ export async function approveAction(id: number): Promise<{ ok: boolean; message:
 }
 
 export async function rejectAction(id: number): Promise<{ ok: boolean; message: string }> {
+  const me = await actionUser()
+  if (!me || !canApprove(me.role)) return NOT_ALLOWED
   const claimed = await claim(id, approverId(), 'rejected')
   if (!claimed) {
     revalidatePath('/approvals')
@@ -55,6 +66,7 @@ export async function rejectAction(id: number): Promise<{ ok: boolean; message: 
     await sendMessage(claimed.notify_chat_id, '❌ Rejected in the app — nothing was done.')
   }
   await logRun(claimed.agent_key, 'rejected', { action_id: id, by: approverId() ?? 'app' })
+  await logActivity(me, 'rejected', claimed.agent_key, id)
   revalidatePath('/approvals')
   return { ok: true, message: 'Rejected — nothing was done.' }
 }

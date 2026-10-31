@@ -285,3 +285,35 @@ code {
 
 /* ---- Two-row dashboard: money row lives in .grid; funnel above it ---- */
 .rowlabel { font-size: 13px; color: var(--ink-soft); font-weight: 600; margin: 0 0 10px; }
+
+/* ---- Logins, admin panel, add/edit forms ---- */
+.userbar { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); }
+.userbar p { margin: 0; font-size: 12px; line-height: 1.5; }
+.userbar .who { color: var(--ink); font-weight: 600; word-break: break-all; }
+.userbar .role { color: var(--dim); }
+.userbar a { color: var(--clay-deep); }
+.card.form, .rf-body { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-13); padding: 16px; margin-bottom: 24px; }
+.card.form h3 { margin: 0 0 12px; font-size: 15px; color: var(--ink); }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.field { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+.field.wide { grid-column: 1 / -1; }
+.field input, .field select, .field textarea, .userctl select, .linkbox input {
+  box-sizing: border-box; width: 100%; background: var(--paper); border: 1px solid var(--line-2); border-radius: var(--r-8);
+  padding: 9px 10px; font-size: 14px; color: var(--ink); font-family: inherit; font-weight: 400;
+}
+.field textarea { min-height: 64px; resize: vertical; }
+.field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--clay); box-shadow: 0 0 0 3px var(--clay-tint); }
+.form-msg { margin-top: 12px; font-size: 13px; line-height: 1.5; }
+.form-msg p { margin: 0; }
+.form-msg.ok { color: #2E5A40; }
+.form-msg.err { color: #8A3E2D; }
+.linkbox { display: flex; gap: 8px; margin-top: 8px; }
+.linkbox input { flex: 1; min-width: 0; font-size: 12px; }
+.userctl .btnrow { flex-wrap: wrap; align-items: center; }
+.userctl select { width: auto; }
+.rf { margin-bottom: 18px; }
+.rf > summary { cursor: pointer; list-style: none; display: inline-block; }
+.rf > summary::-webkit-details-marker { display: none; }
+.rf[open] > summary { margin-bottom: 10px; }
+.edit-link { font-size: 12px; color: var(--clay-deep); text-decoration: none; font-weight: 600; }
+.edit-link:hover { text-decoration: underline; }

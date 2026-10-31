@@ -2,6 +2,8 @@ import { getRecords, getFunnel, rm } from '@/lib/records'
 import { supabase, supabaseConfigured } from '@/lib/supabase'
 import FunnelBar from '@/app/_components/FunnelBar'
 import Stat from '@/app/_components/Stat'
+import { requireTab } from '@/lib/auth'
+import { canSeeMoney } from '@/lib/access'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,8 +20,20 @@ async function proposedCount(): Promise<number> {
 }
 
 export default async function Dashboard() {
+  const me = await requireTab('/')
   const [rows, waiting] = await Promise.all([getRecords(), proposedCount()])
   const funnel = getFunnel(rows)
+
+  // Sales + Staff see the river only — money totals are Admin-only (lib/access.ts).
+  if (!canSeeMoney(me.role)) {
+    return (
+      <>
+        <h1 className="ph">Dashboard</h1>
+        <p className="cap">The river — your whole business, from views to closed deals.</p>
+        <FunnelBar funnel={funnel} />
+      </>
+    )
+  }
 
   // ── The Money row ───────────────────────────────────────────────
   const sum = (cat: string, statuses?: string[]) =>

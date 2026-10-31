@@ -3,7 +3,10 @@ import type { Metadata, Viewport } from 'next'
 import Nav from './_components/Nav'
 import BottomNav from './_components/BottomNav'
 import ConnStatus from './_components/ConnStatus'
+import { TABS } from './_components/tabs'
 import { getPendingCount } from '@/lib/records'
+import { getUser } from '@/lib/auth'
+import { canApprove, canSeeTab, roleLabel } from '@/lib/access'
 
 export const metadata: Metadata = {
   title: 'LuxeVow Weddings',
@@ -21,7 +24,21 @@ export const viewport: Viewport = {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const pending = await getPendingCount()
+  // Only used to SHOW the right menu. Layouts don't re-run on every click, so the
+  // real lock is requireTab() at the top of each page (lib/auth.ts).
+  const user = await getUser()
+
+  // Logged out (login + set-password screens): no sidebar, no bottom bar.
+  if (!user) {
+    return (
+      <html lang="en">
+        <body>{children}</body>
+      </html>
+    )
+  }
+
+  const allowed = TABS.map(t => t.href).filter(href => canSeeTab(user.role, href))
+  const pending = canApprove(user.role) ? await getPendingCount() : 0
   return (
     <html lang="en">
       <body>
@@ -29,13 +46,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {/* Desktop sidebar — hidden on phones (BottomNav takes over ≤768px). */}
           <aside className="side">
             <div className="brand"><img className="logo" src="/icons/logo.png" alt="" /> LuxeVow Weddings</div>
-            <Nav pendingCount={pending} />
-            <p className="hint">One <code>records</code> table behind every tab. Your robots live in <code>agents/</code>.</p>
+            <Nav pendingCount={pending} allowed={allowed} />
+            <div className="userbar">
+              <p className="who">{user.name || user.email}</p>
+              <p className="role">{roleLabel(user.role)} · <a href="/api/logout">Log out</a></p>
+            </div>
           </aside>
           <main className="main"><ConnStatus />{children}</main>
         </div>
         {/* Phone bottom bar — hidden on desktop. */}
-        <BottomNav />
+        <BottomNav allowed={allowed} />
       </body>
     </html>
   )

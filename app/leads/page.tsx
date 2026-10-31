@@ -1,5 +1,8 @@
 import { getRecords, m, rm, type Rec } from '@/lib/records'
 import Empty from '@/app/_components/Empty'
+import { requireTab } from '@/lib/auth'
+import { canEdit } from '@/lib/access'
+import { AddRecord, EditRecord, EditLink } from '@/app/_components/RecordForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,14 +31,22 @@ function nextFollowUp(r: Rec): string {
   return action === '—' ? (r.due_date ? `Follow up by ${r.due_date}` : 'No next step set') : `${action}${when}`
 }
 
-export default async function Leads() {
+export default async function Leads({ searchParams }: { searchParams: Promise<{ edit?: string }> }) {
+  const me = await requireTab('/leads')
+  const editable = canEdit(me.role, 'lead')
+  const { edit } = await searchParams
   const rows = await getRecords()
   const leads = rows.filter(r => r.category === 'lead')
+  const editing = editable && edit ? leads.find(r => String(r.id) === edit) : undefined
 
   return (
     <>
       <h1 className="ph">Leads 🎯</h1>
       <p className="cap">Your funnel: new → appointment → closed → nurture.</p>
+
+      {editable ? (
+        editing ? <EditRecord category="lead" rec={editing} /> : <AddRecord category="lead" />
+      ) : null}
 
       {leads.length === 0 ? (
         <Empty label="leads" />
@@ -56,6 +67,7 @@ export default async function Leads() {
                       <p className="t">{r.title}</p>
                       <p className="s">Potential: {rm(potential(r))}</p>
                       <p className="s">Next: {nextFollowUp(r)}</p>
+                      {editable ? <p className="s"><EditLink path="/leads" id={r.id} /></p> : null}
                     </div>
                   ))
                 )}

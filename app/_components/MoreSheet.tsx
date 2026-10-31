@@ -42,6 +42,9 @@ export default function MoreSheet({
             </Link>
           ))}
         </div>
+        <a className="ms-close" href="/api/logout" style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }}>
+          Log out
+        </a>
         <button type="button" className="ms-close" onClick={onClose}>Close</button>
       </div>
     </div>

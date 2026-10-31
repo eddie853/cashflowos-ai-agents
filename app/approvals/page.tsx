@@ -2,6 +2,7 @@ import { supabase, supabaseConfigured } from '@/lib/supabase'
 import { rm } from '@/lib/records'
 import Empty from '@/app/_components/Empty'
 import ApproveButtons from '@/app/_components/ApproveButtons'
+import { requireTab } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -99,6 +100,7 @@ async function getHistory(): Promise<HistItem[]> {
 }
 
 export default async function Approvals() {
+  await requireTab('/approvals')
   const [pending, history] = await Promise.all([getPending(), getHistory()])
   const live = pending.filter(p => !p.expired)
 

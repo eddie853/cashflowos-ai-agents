@@ -1,5 +1,6 @@
 import { AGENTS } from '@/agents/registry'
 import { supabase, supabaseConfigured } from '@/lib/supabase'
+import { requireTab } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,6 +39,7 @@ function outcomeClass(outcome: string | null): string {
 }
 
 export default async function Employees() {
+  await requireTab('/employees')
   const lastRuns = await getLastRuns()
 
   return (
