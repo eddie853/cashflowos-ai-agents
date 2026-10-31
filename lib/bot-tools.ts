@@ -154,6 +154,35 @@ export const BOT_TOOLS = [
     },
   },
   {
+    name: 'spending_breakdown',
+    description:
+      'EXACT totals of money in or out, grouped by who (artist / customer / merchant), by tag ' +
+      '(meta category, e.g. "Artist", "Meals"), or by month — sorted biggest first, with the overall ' +
+      'total. Use this for ANY "how much did I spend on X", "who cost the most", "spending by ' +
+      'category/month" question. Never add amounts up yourself — quote the totals this returns.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        category: {
+          type: 'string',
+          enum: ['cash_out', 'cash_in'],
+          description: 'cash_out = spending (default), cash_in = income.',
+        },
+        group_by: {
+          type: 'string',
+          enum: ['who', 'tag', 'month'],
+          description: 'who = artist/customer/merchant (default), tag = meta category, month = YYYY-MM.',
+        },
+        query: {
+          type: 'string',
+          description: 'Optional word to filter rows by (title, notes, details), e.g. "year-end" or "Ricky".',
+        },
+        from: { type: 'string', description: 'Optional start date YYYY-MM-DD (inclusive).' },
+        to: { type: 'string', description: 'Optional end date YYYY-MM-DD (inclusive).' },
+      },
+    },
+  },
+  {
     name: 'escalate',
     description:
       'Flag the human owner and stop. Use this — instead of guessing — when the user is frustrated, ' +
@@ -174,6 +203,15 @@ const CLOSED_LOST = new Set(['closed', 'nurture', 'lost', 'reversed'])
 // Whole days a due date is past today (>=0).
 const daysLate = (due: string, today: string) =>
   Math.max(0, Math.floor((Date.parse(today) - Date.parse(due)) / 86_400_000))
+// When the money actually moved: the row's date if it has one, else when it was entered.
+// (Imported history is entered today but dated in the past.)
+const moneyDate = (r: Rec) => r.due_date || (r.created_at || '').slice(0, 10)
+// Who a money row is about — artist / customer / merchant / company, else the title
+// minus any " — 24 Dec" style suffix.
+const whoOf = (r: Rec) =>
+  String(r.meta?.artist || r.meta?.customer || r.meta?.merchant || r.meta?.company || r.title.split(' — ')[0]).trim()
+const matches = (r: Rec, q: string) =>
+  !q || `${r.title} ${r.notes || ''} ${JSON.stringify(r.meta || {})}`.toLowerCase().includes(q)
 
 // ------------------------------------------------------------
 // runBotTool() — execute ONE tool against the already-fetched records. Returns a
@@ -190,9 +228,8 @@ export function runBotTool(name: string, input: any, rows: Rec[]): string {
       const period: 'week' | 'month' | 'all' =
         input?.period === 'week' || input?.period === 'month' ? input.period : 'all'
       const days = period === 'week' ? 7 : period === 'month' ? 30 : Infinity
-      const since = Date.now() - days * 86_400_000
-      const inWindow = (r: Rec) =>
-        !Number.isFinite(days) || new Date(r.created_at).getTime() >= since
+      const since = Number.isFinite(days) ? new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10) : ''
+      const inWindow = (r: Rec) => moneyDate(r) >= since
 
       const cashIn = sum(rows.filter(r => r.category === 'cash_in' && inWindow(r)))
       const cashOut = sum(rows.filter(r => r.category === 'cash_out' && inWindow(r)))
@@ -230,23 +267,59 @@ export function runBotTool(name: string, input: any, rows: Rec[]): string {
     if (name === 'search_records') {
       const q = String(input?.query || '').toLowerCase().trim()
       const cat = input?.category
-      const hits = rows
+      const all = rows
         .filter(r => (cat ? r.category === cat : true))
-        .filter(r => {
-          if (!q) return true
-          const hay = `${r.title} ${r.notes || ''} ${JSON.stringify(r.meta || {})}`.toLowerCase()
-          return hay.includes(q)
-        })
+        .filter(r => matches(r, q))
+      const hits = all
         .slice(0, 25)
         .map(r => ({
+          ...r.meta,
+          tag: r.meta?.category ?? null,
           title: r.title,
           category: r.category,
           status: r.status,
           amount: r.amount,
           due_date: r.due_date,
-          ...r.meta,
         }))
-      return JSON.stringify({ count: hits.length, results: hits })
+      return JSON.stringify({
+        count: all.length,
+        total_amount: rm(sum(all)),
+        showing: hits.length,
+        results: hits,
+      })
+    }
+
+    if (name === 'spending_breakdown') {
+      const cat = input?.category === 'cash_in' ? 'cash_in' : 'cash_out'
+      const by: 'who' | 'tag' | 'month' =
+        input?.group_by === 'tag' || input?.group_by === 'month' ? input.group_by : 'who'
+      const q = String(input?.query || '').toLowerCase().trim()
+      const from = /^\d{4}-\d{2}-\d{2}$/.test(input?.from || '') ? input.from : ''
+      const to = /^\d{4}-\d{2}-\d{2}$/.test(input?.to || '') ? input.to : ''
+      const picked = rows.filter(
+        r =>
+          r.category === cat &&
+          matches(r, q) &&
+          (!from || moneyDate(r) >= from) &&
+          (!to || moneyDate(r) <= to),
+      )
+      const keyOf = (r: Rec) =>
+        by === 'month' ? moneyDate(r).slice(0, 7) : by === 'tag' ? String(r.meta?.category || 'Untagged') : whoOf(r)
+      const groups = new Map<string, Rec[]>()
+      for (const r of picked) groups.set(keyOf(r), [...(groups.get(keyOf(r)) || []), r])
+      const out = [...groups.entries()]
+        .map(([group, rs]) => ({ group, total: sum(rs), total_display: rm(sum(rs)), entries: rs.length }))
+        .sort((a, b) => b.total - a.total)
+      return JSON.stringify({
+        category: cat,
+        group_by: by,
+        filter: { query: q || null, from: from || null, to: to || null },
+        total: sum(picked),
+        total_display: rm(sum(picked)),
+        entries: picked.length,
+        biggest: out[0] || null,
+        groups: out,
+      })
     }
 
     if (name === 'get_funnel') {
